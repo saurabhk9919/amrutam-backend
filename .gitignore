@@ -6,4 +6,7 @@ node_modules/
 coverage/
 dist/
 *.log
-.DS_Store
+.agents/
+.claude/
+.cursor/
+.devin/
