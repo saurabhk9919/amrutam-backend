@@ -1,4 +1,5 @@
 const prisma = require("../../config/database");
+const { createAuditLog } = require("../audit/audit.service");
 
 async function listConsultations(user) {
   let where = {};
@@ -179,6 +180,22 @@ async function updateConsultationStatus(consultationId, user, newStatus) {
       error.statusCode = 409;
       throw error;
     }
+
+    await createAuditLog({
+      actorId: user.id,
+      action:
+        newStatus === "CANCELLED"
+          ? "CONSULTATION_CANCELLED"
+          : "CONSULTATION_STATUS_UPDATED",
+      entityType: "Consultation",
+      entityId: consultationId,
+      requestId: user.requestId || null,
+      metadata: {
+        previousStatus: consultation.status,
+        newStatus,
+      },
+      db: tx,
+    });
 
     return tx.consultation.findUnique({
       where: { id: consultationId },

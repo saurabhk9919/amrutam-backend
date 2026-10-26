@@ -10,7 +10,6 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
-// POST /api/v1/consultations/:id/prescription
 router.post("/:id/prescription", async (req, res, next) => {
   try {
     const validation = prescriptionSchema.safeParse(req.body);
@@ -24,7 +23,7 @@ router.post("/:id/prescription", async (req, res, next) => {
 
     const prescription = await createPrescription(
       req.params.id,
-      req.user,
+      { ...req.user, requestId: req.requestId },
       validation.data
     );
 
@@ -37,7 +36,6 @@ router.post("/:id/prescription", async (req, res, next) => {
   }
 });
 
-// GET /api/v1/consultations/:id/prescription
 router.get("/:id/prescription", async (req, res, next) => {
   try {
     const prescription = await getPrescription(

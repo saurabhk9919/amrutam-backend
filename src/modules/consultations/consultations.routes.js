@@ -56,7 +56,7 @@ router.patch("/:id/status", async (req, res, next) => {
 
     const consultation = await updateConsultationStatus(
       req.params.id,
-      req.user,
+      { ...req.user, requestId: req.requestId },
       validation.data.status
     );
 

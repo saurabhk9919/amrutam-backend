@@ -1,4 +1,5 @@
 const prisma = require("../../config/database");
+const { createAuditLog } = require("../audit/audit.service");
 
 function createError(message, statusCode) {
   const error = new Error(message);
@@ -51,7 +52,7 @@ async function createPrescription(consultationId, user, data) {
         );
       }
 
-      return tx.prescription.create({
+      const prescription = await tx.prescription.create({
         data: {
           consultationId,
           doctorUserId: user.id,
@@ -59,6 +60,20 @@ async function createPrescription(consultationId, user, data) {
           instructions: data.instructions,
         },
       });
+
+      await createAuditLog({
+        actorId: user.id,
+        action: "PRESCRIPTION_CREATED",
+        entityType: "Prescription",
+        entityId: prescription.id,
+        requestId: user.requestId || null,
+        metadata: {
+          consultationId,
+        },
+        db: tx,
+      });
+
+      return prescription;
     });
   } catch (error) {
     if (error.code === "P2002") {

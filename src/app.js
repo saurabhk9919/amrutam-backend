@@ -10,8 +10,13 @@ const availabilityRoutes = require("./modules/availability/availability.routes")
 const bookingRoutes = require("./modules/bookings/booking.routes");
 const consultationRoutes = require("./modules/consultations/consultations.routes");
 const prescriptionRoutes = require("./modules/prescriptions/prescription.routes");
+const {
+  requestIdMiddleware,
+} = require("./middleware/request-id.middleware");
 
 const app = express();
+
+app.use(requestIdMiddleware);
 
 app.disable("x-powered-by");
 app.use(helmet());
