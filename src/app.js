@@ -9,6 +9,7 @@ const authRoutes = require("./modules/auth/auth.routes");
 const availabilityRoutes = require("./modules/availability/availability.routes");
 const bookingRoutes = require("./modules/bookings/booking.routes");
 const consultationRoutes = require("./modules/consultations/consultations.routes");
+const prescriptionRoutes = require("./modules/prescriptions/prescription.routes");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(express.json({ limit: "100kb" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/availability", availabilityRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
+app.use("/api/v1/consultations", prescriptionRoutes);
 app.use("/api/v1/consultations", consultationRoutes);
 
 app.use(
@@ -41,6 +43,12 @@ app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
 
   console.error(err.message);
+
+  if (err.code === "P2002") {
+    return res.status(409).json({
+      error: "Resource conflicts with an existing record",
+    });
+  }
 
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
