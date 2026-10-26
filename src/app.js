@@ -7,6 +7,8 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const authRoutes = require("./modules/auth/auth.routes");
 const availabilityRoutes = require("./modules/availability/availability.routes");
+const bookingRoutes = require("./modules/bookings/booking.routes");
+const consultationRoutes = require("./modules/consultations/consultations.routes");
 
 const app = express();
 
@@ -16,6 +18,8 @@ app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/availability", availabilityRoutes);
+app.use("/api/v1/bookings", bookingRoutes);
+app.use("/api/v1/consultations", consultationRoutes);
 
 app.use(
   rateLimit({
@@ -38,8 +42,9 @@ app.use((err, req, res, next) => {
 
   console.error(err.message);
 
-  res.status(500).json({
-    error: "Internal server error",
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    error: err.statusCode ? err.message : "Internal server error",
   });
 });
 

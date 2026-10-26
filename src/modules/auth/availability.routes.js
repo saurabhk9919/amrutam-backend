@@ -17,7 +17,6 @@ const {
 
 const router = express.Router();
 
-// Create availability: doctors only
 router.post(
   "/",
   authenticateToken,
@@ -45,7 +44,6 @@ router.post(
   }
 );
 
-// List available slots: public
 router.get("/", async (req, res, next) => {
   try {
     const slots = await listAvailableSlots({
