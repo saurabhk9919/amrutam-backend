@@ -2,11 +2,13 @@
   "name": "amrutam-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "prisma skills sync || exit 0"
-  },
+  "start": "node src/server.js",
+  "dev": "nodemon --exec node src/server.js",
+  "test": "jest --runInBand",
+  "test:coverage": "jest --coverage --runInBand"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
