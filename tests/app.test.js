@@ -16,7 +16,27 @@ describe("Amrutam API", () => {
   });
 
   describe("Observability and Health Endpoints", () => {
-    it("GET /metrics should return 200 and prometheus metrics", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalMetricsToken = process.env.METRICS_TOKEN;
+
+    afterEach(() => {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+
+      if (originalMetricsToken === undefined) {
+        delete process.env.METRICS_TOKEN;
+      } else {
+        process.env.METRICS_TOKEN = originalMetricsToken;
+      }
+    });
+
+    it("allows metrics access in development", async () => {
+      process.env.NODE_ENV = "development";
+      delete process.env.METRICS_TOKEN;
+
       const response = await request(app).get("/metrics");
 
       expect(response.status).toBe(200);
@@ -25,22 +45,44 @@ describe("Amrutam API", () => {
       expect(response.text).toContain("amrutam_http_request_duration_seconds");
     });
 
-    it("GET /ready should return 200 when database is reachable", async () => {
-      const prisma = require("../src/config/database");
-      jest.spyOn(prisma, "$queryRaw").mockResolvedValueOnce([{ "?column?": 1 }]);
+    it("rejects metrics requests without a token in production", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.METRICS_TOKEN = "test-metrics-secret";
 
-      const response = await request(app).get("/ready");
+      const response = await request(app).get("/metrics");
 
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        status: "ready",
-        database: "connected",
-      });
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({ error: "Unauthorized" });
     });
 
-    it("GET /ready should return 503 when database query fails", async () => {
+    it("rejects metrics requests with an invalid token in production", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.METRICS_TOKEN = "test-metrics-secret";
+
+      const response = await request(app)
+        .get("/metrics")
+        .set("Authorization", "Bearer wrong-token");
+
+      expect(response.status).toBe(401);
+    });
+
+    it("allows metrics requests with the correct token in production", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.METRICS_TOKEN = "test-metrics-secret";
+
+      const response = await request(app)
+        .get("/metrics")
+        .set("Authorization", "Bearer test-metrics-secret");
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain("amrutam_http_requests_total");
+    });
+
+    it("returns 503 when the database is unavailable", async () => {
       const prisma = require("../src/config/database");
-      jest.spyOn(prisma, "$queryRaw").mockRejectedValueOnce(new Error("Connection failed"));
+      jest
+        .spyOn(prisma, "$queryRaw")
+        .mockRejectedValueOnce(new Error("Connection failed"));
 
       const response = await request(app).get("/ready");
 
@@ -48,6 +90,21 @@ describe("Amrutam API", () => {
       expect(response.body).toEqual({
         status: "not_ready",
         database: "unavailable",
+      });
+    });
+
+    it("returns 200 when the database is reachable", async () => {
+      const prisma = require("../src/config/database");
+      jest
+        .spyOn(prisma, "$queryRaw")
+        .mockResolvedValueOnce([{ "?column?": 1 }]);
+
+      const response = await request(app).get("/ready");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        status: "ready",
+        database: "connected",
       });
     });
   });

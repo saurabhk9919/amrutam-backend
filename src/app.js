@@ -55,7 +55,32 @@ app.use(
 
 app.use(httpMetricsMiddleware);
 app.use(helmet());
-app.use(cors());
+
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Requests without an Origin header include server-to-server calls.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Allow all browser origins locally only when no list is configured.
+      if (
+        process.env.NODE_ENV !== "production" &&
+        allowedOrigins.length === 0
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(null, allowedOrigins.includes(origin));
+    },
+  })
+);
 app.use(express.json({ limit: "100kb" }));
 
 // Apply rate limiting before API routes.
@@ -101,6 +126,20 @@ app.get("/ready", async (req, res) => {
 // Metrics should be exposed only to trusted monitoring infrastructure
 // in production, using network restrictions or an authenticated scrape path.
 app.get("/metrics", async (req, res, next) => {
+  if (process.env.NODE_ENV === "production") {
+    const expectedToken = process.env.METRICS_TOKEN;
+    const authorization = req.headers.authorization;
+
+    if (
+      !expectedToken ||
+      authorization !== `Bearer ${expectedToken}`
+    ) {
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
+    }
+  }
+
   try {
     res.set("Content-Type", metricsRegistry.contentType);
     return res.status(200).send(await metricsRegistry.metrics());
