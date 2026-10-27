@@ -31,14 +31,8 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run automated tests
-        run: npm test
-        env:
-          NODE_ENV: test
-          JWT_SECRET: test-only-secret-for-ci
-
-      - name: Generate coverage report
-        run: npm run test:coverage
+      - name: Run tests with coverage thresholds
+        run: npm run test:ci
         env:
           NODE_ENV: test
           JWT_SECRET: test-only-secret-for-ci
