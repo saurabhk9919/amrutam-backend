@@ -27,6 +27,97 @@ The system also includes structured logging, Prometheus metrics, readiness check
 
 ## 3. High-Level Architecture
 
+```mermaid
+flowchart TD
+    %% Client Layer
+    subgraph Clients["Client Layer"]
+        C1["Patient & Doctor Client Apps"]
+        C2["Admin Portal & Monitoring Tools"]
+    end
+
+    %% Express API Gateway
+    subgraph API["Express.js Application Layer"]
+        subgraph Middleware["Middleware Pipeline"]
+            M1["Request ID Generator"]
+            M2["Security: Helmet & CORS"]
+            M3["Rate Limiting: express-rate-limit"]
+            M4["JSON Body Parser (<= 100KB)"]
+            M5["Auth: JWT Verification & RBAC"]
+        end
+
+        subgraph Routes["API Routing Layer (/api/v1)"]
+            R1["Auth Routes (/auth)"]
+            R2["Availability Routes (/availability)"]
+            R3["Booking Routes (/bookings)"]
+            R4["Consultation Routes (/consultations)"]
+            R5["Prescription Routes (/consultations/:id/prescription)"]
+            R6["Admin Routes (/admin)"]
+            R7["Probes: /health, /ready, /metrics"]
+            R8["Swagger UI: /api-docs"]
+        end
+
+        subgraph Observability["Observability Subsystem"]
+        direction TB
+            O1["Pino Structured Logger (Redaction enabled)"]
+            O2["Prometheus Metrics (prom-client)"]
+        end
+
+        subgraph Services["Business Logic / Service Layer"]
+            S1["Auth Service"]
+            S2["Availability Service"]
+            S3["Booking Service (Idempotent)"]
+            S4["Consultation Service"]
+            S5["Prescription Service"]
+            S6["Admin Service"]
+            S7["Audit Service"]
+        end
+    end
+
+    %% Persistence Layer
+    subgraph DataLayer["Data & Persistence Layer"]
+        ORM["Prisma ORM Client & Transactions"]
+        DB[("PostgreSQL Database")]
+    end
+
+    %% Connections
+    C1 --> M1
+    C2 --> M1
+    M1 --> M2 --> M3 --> M4 --> M5
+    M5 --> Routes
+
+    Routes -.-> Observability
+
+    R1 --> S1
+    R2 --> S2
+    R3 --> S3
+    R4 --> S4
+    R5 --> S5
+    R6 --> S6
+
+    S3 --> S7
+    S4 --> S7
+    S5 --> S7
+    S6 --> S7
+
+    Services --> ORM
+    ORM --> DB
+
+    %% Component styling
+    classDef clientStyle fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0369a1;
+    classDef middlewareStyle fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#92400e;
+    classDef routeStyle fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#5b21b6;
+    classDef serviceStyle fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#15803d;
+    classDef obsStyle fill:#ffedd5,stroke:#ea580c,stroke-width:1.5px,color:#9a3412;
+    classDef dataStyle fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#1e293b;
+
+    class C1,C2 clientStyle;
+    class M1,M2,M3,M4,M5 middlewareStyle;
+    class R1,R2,R3,R4,R5,R6,R7,R8 routeStyle;
+    class S1,S2,S3,S4,S5,S6,S7 serviceStyle;
+    class O1,O2 obsStyle;
+    class ORM,DB dataStyle;
+```
+
 ```text
                  Client Applications
                          |
