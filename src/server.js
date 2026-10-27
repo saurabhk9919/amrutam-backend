@@ -1,32 +1,66 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const app = require("./app");
 const prisma = require("./config/database");
+const { logger } = require("./config/observability");
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 async function startServer() {
+  let server;
+  let shuttingDown = false;
+
   try {
     await prisma.$connect();
 
-    const server = app.listen(PORT, () => {
-      console.log(`Amrutam API running on port ${PORT}`);
+    server = app.listen(PORT, () => {
+      logger.info({ port: PORT }, "Amrutam API started");
     });
 
-    const shutdown = async () => {
-      server.close(async () => {
-        await prisma.$disconnect();
-        process.exit(0);
+    const shutdown = (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+
+      logger.info({ signal }, "Graceful shutdown started");
+
+      server.close(async (closeError) => {
+        try {
+          await prisma.$disconnect();
+
+          if (closeError) {
+            logger.error(
+              { err: closeError },
+              "HTTP server shutdown failed"
+            );
+            process.exitCode = 1;
+          } else {
+            logger.info("Graceful shutdown completed");
+          }
+        } catch (error) {
+          logger.error(
+            { err: error },
+            "Database disconnect failed during shutdown"
+          );
+          process.exitCode = 1;
+        }
       });
     };
 
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    process.once("SIGINT", () => shutdown("SIGINT"));
+    process.once("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {
-    console.error("Failed to start server:", error.message);
-    await prisma.$disconnect();
-    process.exit(1);
+    logger.fatal({ err: error }, "Failed to start server");
+
+    try {
+      await prisma.$disconnect();
+    } finally {
+      process.exitCode = 1;
+    }
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { startServer };

@@ -11,6 +11,12 @@ async function registerUser({
   licenseNumber,
   consultationFee,
 }) {
+  if (!["PATIENT", "DOCTOR"].includes(role)) {
+    const error = new Error("Invalid registration role");
+    error.statusCode = 400;
+    throw error;
+  }
+
   if (role === "DOCTOR") {
     if (
       !specialization ||
