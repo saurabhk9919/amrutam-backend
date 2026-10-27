@@ -191,6 +191,31 @@ describe("Consultation service", () => {
       expect(createAuditLog).not.toHaveBeenCalled();
     });
 
+    it("rejects a patient whose ID matches the assigned doctor", async () => {
+      const patientMatchingDoctorId = {
+        id: doctor.id,
+        role: "PATIENT",
+        requestId: "patient-request",
+      };
+
+      tx.consultation.findUnique.mockResolvedValue(consultation);
+
+      await expect(
+        updateConsultationStatus(
+          consultationId,
+          patientMatchingDoctorId,
+          "CONFIRMED"
+        )
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        message:
+          "Only the assigned doctor or an admin can update consultation status",
+      });
+
+      expect(tx.consultation.updateMany).not.toHaveBeenCalled();
+      expect(createAuditLog).not.toHaveBeenCalled();
+    });
+
     it("rejects an invalid status transition", async () => {
       tx.consultation.findUnique.mockResolvedValue(consultation);
 

@@ -150,7 +150,10 @@ async function updateConsultationStatus(consultationId, user, newStatus) {
       throw error;
     }
 
-    const isDoctor = consultation.slot.doctor.userId === user.id;
+    const isDoctor =
+      user.role === "DOCTOR" &&
+      consultation.slot.doctor.userId === user.id;
+
     const isAdmin = user.role === "ADMIN";
 
     if (!isDoctor && !isAdmin) {
