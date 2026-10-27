@@ -8,7 +8,8 @@
     "dev": "nodemon --exec node src/server.js",
     "test": "jest --runInBand",
     "test:coverage": "jest --coverage --runInBand",
-    "test:ci": "jest --coverage --runInBand --coverageThreshold='{\"global\":{\"statements\":70,\"branches\":55,\"functions\":65,\"lines\":70}}'"
+    "test:ci": "jest --coverage --runInBand --coverageThreshold='{\"global\":{\"statements\":70,\"branches\":55,\"functions\":65,\"lines\":70}}'",
+    "test:integration": "jest tests/booking.integration.test.js --runInBand"
   },
   "keywords": [],
   "author": "",

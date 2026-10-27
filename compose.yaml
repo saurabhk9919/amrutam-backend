@@ -1,0 +1,20 @@
+﻿services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: amrutam-postgres-test
+    environment:
+      POSTGRES_USER: amrutam_test
+      POSTGRES_PASSWORD: local_test_password
+      POSTGRES_DB: amrutam_test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amrutam_test -d amrutam_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - amrutam_test_data:/var/lib/postgresql/data
+
+volumes:
+  amrutam_test_data:
