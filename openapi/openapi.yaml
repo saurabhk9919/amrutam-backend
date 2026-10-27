@@ -1,0 +1,404 @@
+openapi: 3.0.3
+
+info:
+  title: Amrutam Telemedicine API
+  version: 1.0.0
+  description: |
+    REST API for telemedicine authentication, doctor availability,
+    consultation booking, prescriptions, and administrative workflows.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Availability
+  - name: Bookings
+  - name: Consultations
+  - name: Prescriptions
+  - name: Administration
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Check whether the application is running
+      responses:
+        "200":
+          description: Application is running
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Check application and database readiness
+      responses:
+        "200":
+          description: Database is reachable
+        "503":
+          description: Database is unavailable
+
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Retrieve Prometheus metrics
+      description: |
+        Restrict access to trusted monitoring infrastructure in production.
+      responses:
+        "200":
+          description: Prometheus metrics in the registry's configured format
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a patient or doctor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                role:
+                  type: string
+                  enum: [PATIENT, DOCTOR]
+                  default: PATIENT
+                fullName:
+                  type: string
+                licenseNumber:
+                  type: string
+                specialization:
+                  type: string
+      responses:
+        "201":
+          description: User registered successfully
+        "400":
+          description: Invalid registration data
+        "409":
+          description: Duplicate resource
+
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful; returns authentication data
+        "400":
+          description: Invalid request data
+        "401":
+          description: Invalid credentials
+
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+        "401":
+          description: Authentication required
+        "404":
+          description: User not found
+
+  /api/v1/availability:
+    get:
+      tags: [Availability]
+      summary: List available appointment slots
+      parameters:
+        - name: doctorId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Available slots and result count
+
+    post:
+      tags: [Availability]
+      summary: Create availability for the authenticated doctor
+      security:
+        - bearerAuth: []
+      description: Requires the DOCTOR role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startTime, endTime]
+              properties:
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Availability created
+        "400":
+          description: Invalid availability data
+        "401":
+          description: Authentication required
+        "403":
+          description: Doctor role required
+
+  /api/v1/bookings:
+    post:
+      tags: [Bookings]
+      summary: Book an available appointment slot
+      description: |
+        Requires the PATIENT role. The Idempotency-Key header allows safe
+        retries using the same key and request payload.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique key for this booking operation
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotId]
+              properties:
+                slotId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Existing booking returned for an idempotent retry
+        "201":
+          description: Booking created
+        "400":
+          description: Invalid booking request
+        "401":
+          description: Authentication required
+        "403":
+          description: Patient role required or booking not permitted
+        "409":
+          description: Booking conflict or idempotency conflict
+
+  /api/v1/consultations:
+    get:
+      tags: [Consultations]
+      summary: List consultations accessible to the current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Consultation list
+        "401":
+          description: Authentication required
+
+  /api/v1/consultations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Consultations]
+      summary: Get a consultation by ID
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Consultation details
+        "401":
+          description: Authentication required
+        "403":
+          description: Access denied
+        "404":
+          description: Consultation not found
+
+  /api/v1/consultations/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Consultations]
+      summary: Update consultation status
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED]
+      responses:
+        "200":
+          description: Consultation status updated
+        "400":
+          description: Invalid status
+        "401":
+          description: Authentication required
+        "403":
+          description: Access denied
+        "409":
+          description: Invalid state transition
+
+  /api/v1/consultations/{id}/prescription:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Prescriptions]
+      summary: Create a prescription for a completed consultation
+      security:
+        - bearerAuth: []
+      description: Only the assigned doctor can create the prescription.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Prescription payload; validate against the application's prescription schema.
+      responses:
+        "201":
+          description: Prescription created
+        "400":
+          description: Invalid prescription data
+        "401":
+          description: Authentication required
+        "403":
+          description: Access denied
+        "409":
+          description: Prescription already exists or consultation is ineligible
+
+    get:
+      tags: [Prescriptions]
+      summary: Retrieve a consultation prescription
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Prescription details
+        "401":
+          description: Authentication required
+        "403":
+          description: Access denied
+        "404":
+          description: Prescription not found
+
+  /api/v1/admin/doctors/{doctorId}/verify:
+    parameters:
+      - name: doctorId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Administration]
+      summary: Verify a doctor
+      description: Requires the ADMIN role.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Doctor verified successfully
+        "400":
+          description: Invalid doctor ID
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator role required
+        "404":
+          description: Doctor not found
+
+  /api/v1/admin/analytics/consultations:
+    get:
+      tags: [Administration]
+      summary: Retrieve consultation analytics
+      description: Requires the ADMIN role. The `to` timestamp is exclusive.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          description: Inclusive start timestamp
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Exclusive end timestamp; must be after `from`
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Consultation counts and status breakdown
+        "400":
+          description: Invalid date range
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator role required
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

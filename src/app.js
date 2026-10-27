@@ -5,6 +5,9 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const pinoHttp = require("pino-http");
+const path = require("path");
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
 
 const prisma = require("./config/database");
 const {
@@ -25,6 +28,16 @@ const {
 } = require("./middleware/request-id.middleware");
 
 const app = express();
+
+const openApiDocument = YAML.load(
+  path.join(__dirname, "../openapi/openapi.yaml")
+);
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(openApiDocument)
+);
 
 app.disable("x-powered-by");
 
