@@ -4,11 +4,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: migration
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your shell}
     depends_on:
       db:
         condition: service_healthy
@@ -20,12 +22,11 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: "5000"
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your shell}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your shell}
-      METRICS_TOKEN: ${METRICS_TOKEN:?Set METRICS_TOKEN in your shell}
     ports:
       - "5000:5000"
     depends_on:
@@ -47,10 +48,11 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: amrutam
       POSTGRES_USER: amrutam
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

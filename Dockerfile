@@ -10,6 +10,10 @@ RUN npx prisma generate
 COPY src ./src
 COPY openapi ./openapi
 
+FROM build AS migration
+ENV NODE_ENV=production
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 FROM node:24-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
