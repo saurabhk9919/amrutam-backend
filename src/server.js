@@ -3,6 +3,7 @@ require("dotenv").config({ quiet: true });
 const app = require("./app");
 const prisma = require("./config/database");
 const { logger } = require("./config/observability");
+const { validateConfig } = require("./config/validate-config");
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -11,6 +12,7 @@ async function startServer() {
   let shuttingDown = false;
 
   try {
+    validateConfig();
     await prisma.$connect();
 
     server = app.listen(PORT, () => {
