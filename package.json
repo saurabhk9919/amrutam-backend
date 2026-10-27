@@ -4,15 +4,18 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-  "start": "node src/server.js",
-  "dev": "nodemon --exec node src/server.js",
-  "test": "jest --runInBand",
-  "test:coverage": "jest --coverage --runInBand"
-},
+    "start": "node src/server.js",
+    "dev": "nodemon --exec node src/server.js",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --coverage --runInBand"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
+  },
   "dependencies": {
     "@opentelemetry/api": "^1.10.0",
     "@prisma/client": "^6.19.3",
@@ -32,6 +35,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/swagger-ui-express": "^4.1.8",
     "jest": "^30.5.2",
     "nodemon": "^3.1.14",
     "prisma": "^6.19.3",
