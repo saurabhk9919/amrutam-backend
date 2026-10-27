@@ -159,6 +159,46 @@ describe("Booking integration tests (PostgreSQL)", () => {
     }
   });
 
+  it("replays the successful response for simultaneous requests with the same idempotency key", async () => {
+    const idempotencyKey = `booking-${randomUUID()}`;
+
+    const results = await Promise.allSettled([
+      createBooking(patient1.id, {
+        slotId: slot.id,
+        idempotencyKey,
+      }),
+      createBooking(patient1.id, {
+        slotId: slot.id,
+        idempotencyKey,
+      }),
+    ]);
+
+    const fulfilled = results.filter(
+      (result) => result.status === "fulfilled"
+    );
+    const rejected = results.filter(
+      (result) => result.status === "rejected"
+    );
+
+    expect(fulfilled).toHaveLength(2);
+    expect(rejected).toHaveLength(0);
+
+    expect(fulfilled[0].value.statusCode).toBe(201);
+    expect(fulfilled[1].value.statusCode).toBe(201);
+
+    expect(
+      JSON.parse(JSON.stringify(fulfilled[0].value.body))
+    ).toEqual(
+      JSON.parse(JSON.stringify(fulfilled[1].value.body))
+    );
+
+    const count = await prisma.consultation.count({
+      where: { slotId: slot.id },
+    });
+
+    expect(count).toBe(1);
+  });
+
   it("allows only one patient to book a slot concurrently", async () => {
     const results = await Promise.allSettled([
       createBooking(patient1.id, {
@@ -208,4 +248,3 @@ describe("Booking integration tests (PostgreSQL)", () => {
     expect(record).toBeNull();
   });
 });
-
