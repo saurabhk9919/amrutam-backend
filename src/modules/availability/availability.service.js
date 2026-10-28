@@ -21,6 +21,12 @@ async function createAvailability(userId, { startTime, endTime }) {
     throw error;
   }
 
+  if (!doctor.isVerified) {
+    const error = new Error("Doctor is not verified");
+    error.statusCode = 403;
+    throw error;
+  }
+
   return prisma.availabilitySlot.create({
     data: {
       doctorId: doctor.id,
@@ -34,6 +40,9 @@ async function listAvailableSlots({ doctorId, from, to }) {
   return prisma.availabilitySlot.findMany({
     where: {
       status: "OPEN",
+      doctor: {
+        isVerified: true,
+      },
       ...(doctorId ? { doctorId } : {}),
       ...(from || to
         ? {

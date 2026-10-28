@@ -118,7 +118,37 @@ For local development, if you are creating a new migration, use:
 npx prisma migrate dev --name describe_your_change
 ```
 
-### 5. Start the server
+### 5. Safe production Compose startup
+
+For production Compose, create `.env` from `.env.example` and provide real
+deployment-specific values locally. Do not commit `.env`, `.env.test`, or
+anything under `secrets/`.
+
+Prometheus reads its metrics token from an ignored local file. Create it
+without placing the token in Git:
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force secrets
+[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)) |
+  Set-Content -NoNewline secrets/metrics_token.txt
+```
+
+Set `GRAFANA_ADMIN_PASSWORD` in the shell that starts Compose. Validate the
+rendered configuration, apply committed migrations through the dedicated
+migration service, and then start the application:
+
+```bash
+docker compose -f compose.prod.yaml config --quiet
+docker compose -f compose.prod.yaml up migrate
+docker compose -f compose.prod.yaml up -d
+```
+
+Do not expose the database or Grafana publicly. Confirm `/health`, `/ready`,
+and the authenticated `/metrics` endpoint after startup.
+
+### 6. Start the server
 
 Development mode with automatic restarts:
 
@@ -159,7 +189,7 @@ The OpenAPI specification is available in [`openapi/openapi.yaml`](openapi/opena
 | GET | `/api/v1/consultations` | Retrieve permitted consultations |
 | GET | `/api/v1/consultations/:id` | Retrieve a consultation |
 | PATCH | `/api/v1/consultations/:id/status` | Update consultation status |
-| POST | `/api/v1/consultations` | Create a prescription, subject to authorization |
+| POST | `/api/v1/consultations/:id/prescription` | Create a prescription, subject to authorization |
 | GET | `/api/v1/consultations/:id/prescription` | Retrieve a prescription, subject to authorization |
 | PATCH | `/api/v1/admin/doctors/:doctorId/verify` | Verify a doctor as an administrator |
 | GET | `/api/v1/admin/analytics/consultations` | Retrieve consultation analytics |

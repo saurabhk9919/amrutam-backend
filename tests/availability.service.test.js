@@ -29,6 +29,7 @@ describe("Availability Service", () => {
       const doctor = {
         id: "doctor-123",
         userId,
+        isVerified: true,
       };
 
       const createdSlot = {
@@ -89,6 +90,26 @@ describe("Availability Service", () => {
       expect(prisma.doctor.findUnique).not.toHaveBeenCalled();
     });
 
+    test("rejects availability creation for an unverified doctor", async () => {
+      prisma.doctor.findUnique.mockResolvedValue({
+        id: "doctor-123",
+        userId,
+        isVerified: false,
+      });
+
+      await expect(
+        createAvailability(userId, {
+          startTime,
+          endTime,
+        })
+      ).rejects.toMatchObject({
+        message: "Doctor is not verified",
+        statusCode: 403,
+      });
+
+      expect(prisma.availabilitySlot.create).not.toHaveBeenCalled();
+    });
+
     test("returns 404 when doctor profile does not exist", async () => {
       prisma.doctor.findUnique.mockResolvedValue(null);
 
@@ -120,6 +141,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
         },
         orderBy: {
           startTime: "asc",
@@ -139,6 +163,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           doctorId: "doctor-123",
         },
         orderBy: {
@@ -158,6 +185,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           startTime: {
             gte: new Date("2026-11-01T00:00:00.000Z"),
             lt: new Date("2026-11-02T00:00:00.000Z"),
@@ -180,6 +210,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           doctorId: "doctor-123",
           startTime: {
             gte: new Date("2026-11-01T00:00:00.000Z"),

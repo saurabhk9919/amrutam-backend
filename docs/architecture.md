@@ -147,7 +147,36 @@ flowchart TD
 
 The diagram represents the logical architecture. Monitoring, CI, and API documentation are supporting capabilities rather than separate request-processing services.
 
-## 4. Main Modules
+## 4. Booking Flow
+
+```mermaid
+sequenceDiagram
+    participant Patient
+    participant API as Express API
+    participant Booking as Booking Service
+    participant DB as PostgreSQL
+
+    Patient->>API: POST /api/v1/bookings + Idempotency-Key
+    API->>Booking: Authenticate, validate, and hash request
+    Booking->>DB: Look up idempotency key
+    alt Previously completed request
+        DB-->>Booking: Stored response
+        Booking-->>API: Replay stored response
+    else New request
+        Booking->>DB: Transaction: create key and read OPEN slot
+        Booking->>DB: Conditional update OPEN -> BOOKED
+        Booking->>DB: Create consultation and store response
+        DB-->>Booking: Commit or conflict
+        Booking-->>API: 201 booking or 409 conflict
+    end
+    API-->>Patient: JSON response
+```
+
+The conditional slot update and unique database constraints protect the
+booking operation when requests race for the same slot. No external cache or
+worker is required by the current implementation.
+
+## 5. Main Modules
 
 ### Authentication
 
@@ -171,7 +200,76 @@ Prescription creation is restricted to the assigned doctor and an eligible compl
 
 Administrators can verify doctors and retrieve consultation analytics for an optional date range. Doctor verification records an audit event, and repeating verification does not create another verification event.
 
-## 5. Data Model
+## 6. Data Model
+
+```mermaid
+erDiagram
+    USER ||--o| PROFILE : has
+    USER ||--o| DOCTOR : may_have
+    DOCTOR ||--o{ AVAILABILITY_SLOT : publishes
+    USER ||--o{ CONSULTATION : books
+    AVAILABILITY_SLOT ||--o| CONSULTATION : reserves
+    CONSULTATION ||--o| PRESCRIPTION : has
+    CONSULTATION ||--o{ PAYMENT : has
+    USER ||--o{ AUDIT_LOG : creates
+    USER ||--o{ IDEMPOTENCY_KEY : owns
+
+    USER {
+        uuid id PK
+        string email UK
+        enum role
+        boolean is_active
+        boolean mfa_enabled
+    }
+    PROFILE {
+        uuid id PK
+        uuid user_id FK,UK
+        string full_name
+    }
+    DOCTOR {
+        uuid id PK
+        uuid user_id FK,UK
+        string license_number UK
+        boolean is_verified
+    }
+    AVAILABILITY_SLOT {
+        uuid id PK
+        uuid doctor_id FK
+        datetime start_time
+        datetime end_time
+        enum status
+    }
+    CONSULTATION {
+        uuid id PK
+        uuid patient_id FK
+        uuid slot_id FK,UK
+        enum status
+    }
+    PRESCRIPTION {
+        uuid id PK
+        uuid consultation_id FK,UK
+        uuid doctor_user_id FK
+        json details
+    }
+    PAYMENT {
+        uuid id PK
+        uuid consultation_id FK
+        decimal amount
+        enum status
+    }
+    AUDIT_LOG {
+        uuid id PK
+        uuid actor_id FK
+        string action
+        string entity_id
+    }
+    IDEMPOTENCY_KEY {
+        uuid id PK
+        uuid user_id FK
+        string key
+        datetime expires_at
+    }
+```
 
 The Prisma schema contains the following principal models:
 
@@ -188,7 +286,7 @@ The Prisma schema contains the following principal models:
 
 PostgreSQL stores persistent application data. Prisma provides database access and transaction support. Database constraints, indexes, and conditional updates support integrity and concurrent operations.
 
-## 6. Security and Access Control
+## 7. Security and Access Control
 
 - Passwords are stored as bcrypt hashes, not plaintext.
 - JWTs authenticate protected requests.
@@ -203,7 +301,7 @@ PostgreSQL stores persistent application data. Prisma provides database access a
 
 Production deployment must also protect secrets, use HTTPS, restrict monitoring endpoints, and apply appropriate database permissions and backup policies.
 
-## 7. Reliability and Observability
+## 8. Reliability and Observability
 
 ### Health and readiness
 
@@ -221,7 +319,7 @@ Structured logs include request correlation information. The server handles shut
 
 The application centralizes error handling and maps Prisma unique-constraint conflicts to HTTP 409 responses. Readiness failures return HTTP 503.
 
-## 8. Performance and Scaling Strategy
+## 9. Performance and Scaling Strategy
 
 The current architecture is a modular Node.js API backed by PostgreSQL. The following measures support its performance and provide a path to scale:
 
@@ -235,13 +333,13 @@ The current architecture is a modular Node.js API backed by PostgreSQL. The foll
 
 The assessment targets of 100,000 daily consultations, p95 read latency below 200 ms, p95 write latency below 500 ms, and 99.95% availability are design goals, not verified production results. Load testing, capacity planning, deployment redundancy, and operational monitoring are required to demonstrate those targets.
 
-## 9. Deployment and CI
+## 10. Deployment and CI
 
 GitHub Actions runs the automated test suite and coverage checks. The application is designed to use environment variables for configuration and secrets.
 
 A production deployment should include automated migrations, container image management, secure secret injection, health-based traffic routing, backups, and a rollback strategy. These deployment controls should be documented as implemented only when they are actually configured.
 
-## 10. Known Limitations and Future Work
+## 11. Known Limitations and Future Work
 
 - Restrict `/metrics` to trusted monitoring infrastructure before public production deployment.
 - Review the OpenAPI schemas against all runtime validation rules.

@@ -108,7 +108,11 @@ async function loginUser({ email, password }) {
     where: { email },
   });
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  if (
+    !user ||
+    !(await bcrypt.compare(password, user.passwordHash)) ||
+    !user.isActive
+  ) {
     const error = new Error("Invalid email or password");
     error.statusCode = 401;
     throw error;

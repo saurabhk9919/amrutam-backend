@@ -3,9 +3,16 @@ jest.mock("../src/modules/admin/admin.service", () => ({
   getConsultationAnalytics: jest.fn(),
 }));
 
+jest.mock("../src/config/database", () => ({
+  user: {
+    findUnique: jest.fn(),
+  },
+}));
+
 const express = require("express");
 const request = require("supertest");
 const jwt = require("jsonwebtoken");
+const prisma = require("../src/config/database");
 
 const {
   verifyDoctor,
@@ -44,6 +51,7 @@ describe("Admin Routes", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.user.findUnique.mockResolvedValue({ isActive: true });
   });
 
   describe("PATCH /api/v1/admin/doctors/:doctorId/verify", () => {

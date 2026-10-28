@@ -20,7 +20,10 @@ jest.mock("bcrypt", () => ({
 
 const bcrypt = require("bcrypt");
 const prisma = require("../src/config/database");
-const { registerUser } = require("../src/modules/auth/auth.service");
+const {
+  registerUser,
+  loginUser,
+} = require("../src/modules/auth/auth.service");
 const {
   createAvailability,
   listAvailableSlots,
@@ -40,6 +43,7 @@ describe("Availability Service", () => {
       const doctor = {
         id: "doctor-123",
         userId,
+        isVerified: true,
       };
 
       const createdSlot = {
@@ -100,6 +104,26 @@ describe("Availability Service", () => {
       expect(prisma.doctor.findUnique).not.toHaveBeenCalled();
     });
 
+    test("rejects availability creation for an unverified doctor", async () => {
+      prisma.doctor.findUnique.mockResolvedValue({
+        id: "doctor-123",
+        userId,
+        isVerified: false,
+      });
+
+      await expect(
+        createAvailability(userId, {
+          startTime,
+          endTime,
+        })
+      ).rejects.toMatchObject({
+        message: "Doctor is not verified",
+        statusCode: 403,
+      });
+
+      expect(prisma.availabilitySlot.create).not.toHaveBeenCalled();
+    });
+
     test("returns 404 when doctor profile does not exist", async () => {
       prisma.doctor.findUnique.mockResolvedValue(null);
 
@@ -131,6 +155,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
         },
         orderBy: {
           startTime: "asc",
@@ -150,6 +177,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           doctorId: "doctor-123",
         },
         orderBy: {
@@ -169,6 +199,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           startTime: {
             gte: new Date("2026-11-01T00:00:00.000Z"),
             lt: new Date("2026-11-02T00:00:00.000Z"),
@@ -191,6 +224,9 @@ describe("Availability Service", () => {
       expect(prisma.availabilitySlot.findMany).toHaveBeenCalledWith({
         where: {
           status: "OPEN",
+          doctor: {
+            isVerified: true,
+          },
           doctorId: "doctor-123",
           startTime: {
             gte: new Date("2026-11-01T00:00:00.000Z"),
@@ -228,6 +264,33 @@ describe("Availability Service", () => {
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       expect(prisma.user.create).not.toHaveBeenCalled();
       expect(bcrypt.hash).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("loginUser", () => {
+    beforeEach(() => {
+      process.env.JWT_SECRET = "test-jwt-secret";
+    });
+
+    test("rejects inactive users even with a valid password", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-123",
+        email: "inactive@example.com",
+        role: "PATIENT",
+        passwordHash: "hashed-password",
+        isActive: false,
+      });
+      bcrypt.compare.mockResolvedValue(true);
+
+      await expect(
+        loginUser({
+          email: "inactive@example.com",
+          password: "Password123!",
+        })
+      ).rejects.toMatchObject({
+        message: "Invalid email or password",
+        statusCode: 401,
+      });
     });
   });
 });

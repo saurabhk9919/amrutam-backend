@@ -3,7 +3,14 @@ jest.mock("jsonwebtoken", () => ({
   verify: jest.fn(),
 }));
 
+jest.mock("../src/config/database", () => ({
+  user: {
+    findUnique: jest.fn(),
+  },
+}));
+
 const jwt = require("jsonwebtoken");
+const prisma = require("../src/config/database");
 const {
   authenticateToken,
   authorizeRoles,
@@ -80,15 +87,16 @@ describe("Authentication Middleware", () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    test("authenticates a valid token and attaches user details", () => {
+    test("authenticates a valid token and attaches user details", async () => {
       req.headers.authorization = "Bearer valid-token";
 
       jwt.verify.mockReturnValue({
         sub: "user-123",
         role: "PATIENT",
       });
+      prisma.user.findUnique.mockResolvedValue({ isActive: true });
 
-      authenticateToken(req, res, next);
+      await authenticateToken(req, res, next);
 
       expect(jwt.verify).toHaveBeenCalledWith(
         "valid-token",
@@ -100,6 +108,23 @@ describe("Authentication Middleware", () => {
       });
       expect(next).toHaveBeenCalledTimes(1);
       expect(res.status).not.toHaveBeenCalled();
+    });
+
+    test("rejects a token for an inactive user", async () => {
+      req.headers.authorization = "Bearer inactive-token";
+      jwt.verify.mockReturnValue({
+        sub: "user-123",
+        role: "PATIENT",
+      });
+      prisma.user.findUnique.mockResolvedValue({ isActive: false });
+
+      await authenticateToken(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Invalid or expired token",
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     test("rejects an invalid token", () => {
@@ -176,4 +201,3 @@ describe("Authentication Middleware", () => {
     });
   });
 });
-
