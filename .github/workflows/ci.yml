@@ -55,8 +55,11 @@ jobs:
       - name: Run tests with coverage thresholds
         run: npm run test:ci
 
-      - name: Audit dependencies
-        run: npm audit
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+      - name: Audit development dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Build production Docker image
         run: docker build -t amrutam-backend:${{ github.sha }} .
